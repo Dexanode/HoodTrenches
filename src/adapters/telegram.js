@@ -1,12 +1,29 @@
 const esc = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 const money = (value) => `$${Number(value ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class TelegramController {
   constructor(config, bot, store, logger) { this.config = config; this.bot = bot; this.store = store; this.logger = logger; this.offset = 0; this.timer = null; this.polling = false; }
   configured() { return Boolean(this.config.telegramBotToken && this.config.telegramChatId); }
   start() { if (!this.configured()) { this.logger.warn("Telegram disabled: token or chat ID missing"); return; } this.bot.setAlertSink((event) => this.sendAlpha(event)); this.timer = setInterval(() => this.pollOnce(), 3000); this.pollOnce(); }
   stop() { if (this.timer) clearInterval(this.timer); }
-  async call(method, payload) { const response = await fetch(`https://api.telegram.org/bot${this.config.telegramBotToken}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15_000) }); const body = await response.json(); if (!body.ok) throw new Error(body.description ?? `Telegram HTTP ${response.status}`); return body; }
+  async call(method, payload) {
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${this.config.telegramBotToken}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15_000) });
+        const body = await response.json();
+        if (!body.ok) throw Object.assign(new Error(body.description ?? `Telegram HTTP ${response.status}`), { telegramApiError: true });
+        return body;
+      } catch (error) {
+        if (error.telegramApiError) throw error;
+        lastError = error;
+        if (attempt < 3) await sleep(attempt * 1000);
+      }
+    }
+    const detail = lastError?.cause?.code ?? lastError?.cause?.message ?? lastError?.message ?? "unknown network error";
+    throw new Error(`Telegram network failed after 3 attempts: ${detail}`);
+  }
   send(text) { return this.call("sendMessage", { chat_id: this.config.telegramChatId, text, parse_mode: "HTML", disable_web_page_preview: true }); }
   async pollOnce() { if (this.polling) return; this.polling = true; try { await this.poll(); } catch (error) { this.logger.warn("Telegram polling failed", { error: error.message }); } finally { this.polling = false; } }
   async sendAlpha(event) {
