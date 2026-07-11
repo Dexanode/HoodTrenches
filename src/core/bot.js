@@ -3,8 +3,13 @@ import { TwitterNarrative } from "../adapters/twitter.js";
 import { scoreToken } from "./scoring.js";
 
 export class HoodTrenchesBot {
-  constructor(config, store, logger) { this.config = config; this.store = store; this.logger = logger; this.gmgn = new GmgnTrenches(config); this.twitter = new TwitterNarrative(config, store); this.timer = null; this.paused = false; this.alertSink = null; this.alertedAt = new Map(); }
+  constructor(config, store, logger) { this.config = config; this.store = store; this.logger = logger; this.gmgn = new GmgnTrenches(config); this.twitter = new TwitterNarrative(config, store); this.timer = null; this.paused = false; this.alertSink = null; this.batchSink = null; this.alertedAt = new Map(); }
   setAlertSink(sink) { this.alertSink = sink; }
+  setBatchSink(sink) { this.batchSink = sink; }
+  shouldAlertImmediately(event) {
+    const socialStrong = event.social.available && (event.social.engagementPerView >= 3 || event.social.velocityPerMinute >= 5);
+    return event.analysis.score >= this.config.minAlphaScore || event.analysis.walletHits.length > 0 || socialStrong;
+  }
   async start() { if (!this.config.gmgnApiKey) throw new Error("GMGN_API_KEY is required"); this.store.setStatus("running"); await this.loop(); this.timer = setInterval(() => this.loop().catch((error) => this.fail(error)), this.config.pollIntervalMs); }
   stop() { if (this.timer) clearInterval(this.timer); this.store.setStatus("stopped"); }
   pause() { this.paused = true; this.store.setStatus("paused"); }
@@ -19,10 +24,12 @@ export class HoodTrenchesBot {
       const event = { ...token, social, analysis };
       this.store.addEvent(event);
       const last = this.alertedAt.get(token.address) ?? 0;
-      const isNewListing = token.stage === "new_creation";
-      const isQualifiedUpdate = analysis.score >= this.config.minAlphaScore && token.liquidityUsd >= this.config.minLiquidityUsd;
-      if (this.alertSink && (isNewListing || isQualifiedUpdate) && Date.now() - last >= this.config.alertCooldownMs) {
+      const hasMinimumLiquidity = token.liquidityUsd >= this.config.minLiquidityUsd;
+      const immediate = this.shouldAlertImmediately(event) && hasMinimumLiquidity;
+      if (this.alertSink && immediate && Date.now() - last >= this.config.alertCooldownMs) {
         await this.alertSink(event); this.alertedAt.set(token.address, Date.now());
+      } else if (token.stage === "new_creation" && this.batchSink) {
+        this.batchSink(event);
       }
     }
     if (tokens.length) this.store.addLog("info", "GMGN cycle completed", { scanned: tokens.length });

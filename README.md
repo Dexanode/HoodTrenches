@@ -1,6 +1,6 @@
 # HoodTrenches
 
-Robinhood Chain intelligence bot. It watches GMGN Trenches, enriches direct token tweets through FxTwitter, computes deterministic social/deployer/risk signals, and sends alerts to a private Telegram group. Every `new_creation` is announced with a verdict; later stage updates are sent when qualified. It does not trade and does not use an LLM.
+Robinhood Chain intelligence bot. It watches GMGN Trenches, enriches direct token tweets through FxTwitter, computes deterministic social/deployer/risk signals, and sends alerts to a private Telegram group. Qualified, tracked-wallet, or strong-social listings are sent immediately; other `new_creation` listings are summarized in a periodic top-five digest. It does not trade and does not use an LLM.
 
 ## Pipeline
 

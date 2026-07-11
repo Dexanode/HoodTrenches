@@ -24,6 +24,8 @@ export function loadConfig() {
     alertCooldownMs: number("ALERT_COOLDOWN_MS", 30 * 60_000),
     minAlphaScore: number("MIN_ALPHA_SCORE", 45),
     minLiquidityUsd: number("MIN_LIQUIDITY_USD", 0),
+    newListingBatchIntervalMs: number("NEW_LISTING_BATCH_INTERVAL_MS", 120_000),
+    newListingBatchLimit: number("NEW_LISTING_BATCH_LIMIT", 5),
     pollIntervalMs: number("POLL_INTERVAL_MS", 5_000),
     telegramBotToken: get("TELEGRAM_BOT_TOKEN"),
     telegramChatId: get("TELEGRAM_CHAT_ID"),

@@ -3,10 +3,10 @@ const money = (value) => `$${Number(value ?? 0).toLocaleString("en-US", { maximu
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class TelegramController {
-  constructor(config, bot, store, logger) { this.config = config; this.bot = bot; this.store = store; this.logger = logger; this.offset = 0; this.timer = null; this.polling = false; }
+  constructor(config, bot, store, logger) { this.config = config; this.bot = bot; this.store = store; this.logger = logger; this.offset = 0; this.timer = null; this.batchTimer = null; this.polling = false; this.batch = new Map(); }
   configured() { return Boolean(this.config.telegramBotToken && this.config.telegramChatId); }
-  start() { if (!this.configured()) { this.logger.warn("Telegram disabled: token or chat ID missing"); return; } this.bot.setAlertSink((event) => this.sendAlpha(event)); this.timer = setInterval(() => this.pollOnce(), 3000); this.pollOnce(); }
-  stop() { if (this.timer) clearInterval(this.timer); }
+  start() { if (!this.configured()) { this.logger.warn("Telegram disabled: token or chat ID missing"); return; } this.bot.setAlertSink((event) => this.sendAlpha(event)); this.bot.setBatchSink((event) => this.enqueueBatch(event)); this.timer = setInterval(() => this.pollOnce(), 3000); this.batchTimer = setInterval(() => this.flushBatch().catch((error) => this.logger.warn("Telegram batch failed", { error: error.message })), this.config.newListingBatchIntervalMs); this.pollOnce(); }
+  stop() { if (this.timer) clearInterval(this.timer); if (this.batchTimer) clearInterval(this.batchTimer); }
   async call(method, payload) {
     let lastError;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -25,6 +25,19 @@ export class TelegramController {
     throw new Error(`Telegram network failed after 3 attempts: ${detail}`);
   }
   send(text) { return this.call("sendMessage", { chat_id: this.config.telegramChatId, text, parse_mode: "HTML", disable_web_page_preview: true }); }
+  enqueueBatch(event) { this.batch.set(event.address, event); }
+  async flushBatch() {
+    if (!this.batch.size) return;
+    const events = [...this.batch.values()].sort((left, right) => right.analysis.score - left.analysis.score);
+    this.batch.clear();
+    const shown = events.slice(0, this.config.newListingBatchLimit);
+    const rows = shown.map((event, index) => {
+      const verdict = event.analysis.score >= 30 ? "WATCH" : "HIGH RISK";
+      const risks = event.analysis.risks.slice(0, 2).join(", ") || "no major flag";
+      return `${index + 1}. <b>${esc(event.symbol)}</b> · ${event.analysis.score}/100 ${verdict}\n   ${money(event.marketCapUsd)} MC · ${event.smartWalletCount} smart · ${esc(event.launchpad)}\n   ${esc(risks)}\n   <code>${esc(event.address)}</code>`;
+    });
+    await this.send([`📦 <b>NEW TRENCHES · ${Math.round(this.config.newListingBatchIntervalMs / 60_000)} MIN</b>`,`${events.length} token(s) detected · showing top ${shown.length}`,"",...rows].join("\n"));
+  }
   async pollOnce() { if (this.polling) return; this.polling = true; try { await this.poll(); } catch (error) { this.logger.warn("Telegram polling failed", { error: error.message }); } finally { this.polling = false; } }
   async sendAlpha(event) {
     const s = event.social; const a = event.analysis; const narrative = s.available ? s.text.slice(0, 300) : event.description || "No direct X narrative";
