@@ -2,12 +2,13 @@ const esc = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("
 const money = (value) => `$${Number(value ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
 export class TelegramController {
-  constructor(config, bot, store, logger) { this.config = config; this.bot = bot; this.store = store; this.logger = logger; this.offset = 0; this.timer = null; }
+  constructor(config, bot, store, logger) { this.config = config; this.bot = bot; this.store = store; this.logger = logger; this.offset = 0; this.timer = null; this.polling = false; }
   configured() { return Boolean(this.config.telegramBotToken && this.config.telegramChatId); }
-  start() { if (!this.configured()) { this.logger.warn("Telegram disabled: token or chat ID missing"); return; } this.bot.setAlertSink((event) => this.sendAlpha(event)); this.timer = setInterval(() => this.poll().catch((error) => this.logger.warn("Telegram polling failed", { error: error.message })), 3000); }
+  start() { if (!this.configured()) { this.logger.warn("Telegram disabled: token or chat ID missing"); return; } this.bot.setAlertSink((event) => this.sendAlpha(event)); this.timer = setInterval(() => this.pollOnce(), 3000); this.pollOnce(); }
   stop() { if (this.timer) clearInterval(this.timer); }
   async call(method, payload) { const response = await fetch(`https://api.telegram.org/bot${this.config.telegramBotToken}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15_000) }); const body = await response.json(); if (!body.ok) throw new Error(body.description ?? `Telegram HTTP ${response.status}`); return body; }
   send(text) { return this.call("sendMessage", { chat_id: this.config.telegramChatId, text, parse_mode: "HTML", disable_web_page_preview: true }); }
+  async pollOnce() { if (this.polling) return; this.polling = true; try { await this.poll(); } catch (error) { this.logger.warn("Telegram polling failed", { error: error.message }); } finally { this.polling = false; } }
   async sendAlpha(event) {
     const s = event.social; const a = event.analysis; const narrative = s.available ? s.text.slice(0, 300) : event.description || "No direct X narrative";
     const heading = event.stage === "new_creation" ? "🆕 <b>NEW TRENCHES LISTED</b>" : "🚨 <b>HOODTRENCHES UPDATE</b>";
