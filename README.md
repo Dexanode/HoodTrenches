@@ -20,6 +20,8 @@ GMGN Robinhood Trenches
 2. Run `npm install`.
 3. Run `npm start`.
 
+Keep `GMGN_CLI_PATH=node_modules/.bin/gmgn-cli` in production. HoodTrenches pins a CLI release that supports the `robinhood` chain; an older globally installed `gmgn-cli` may reject it.
+
 ## Production with PM2
 
 The tracker is a continuous process, not a scheduled cron task. PM2 keeps it alive and restores it after a crash or VPS reboot.
@@ -39,6 +41,14 @@ pm2 status
 pm2 logs hoodtrenches
 pm2 restart hoodtrenches --update-env
 pm2 stop hoodtrenches
+```
+
+If Telegram reports `terminated by other getUpdates request`, another process is using the same bot token. Keep exactly one HoodTrenches process:
+
+```bash
+pm2 delete hoodtrenches
+pm2 start ecosystem.config.cjs
+pm2 save
 ```
 
 Telegram commands: `/status`, `/wallets`, `/addwallet 0x... label`, `/delwallet 0x...`, `/pause`, `/resume`.

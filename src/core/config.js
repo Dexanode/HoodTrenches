@@ -17,7 +17,7 @@ const number = (name, fallback) => Number.isFinite(Number(get(name))) ? Number(g
 export function loadConfig() {
   return Object.freeze({
     gmgnApiKey: get("GMGN_API_KEY"),
-    gmgnCliPath: get("GMGN_CLI_PATH", "gmgn-cli"),
+    gmgnCliPath: get("GMGN_CLI_PATH", "node_modules/.bin/gmgn-cli"),
     gmgnPollIntervalMs: number("GMGN_POLL_INTERVAL_MS", 15_000),
     gmgnTrenchesLimit: number("GMGN_TRENCHES_LIMIT", 80),
     twitterPollIntervalMs: number("TWITTER_POLL_INTERVAL_MS", 5 * 60_000),
