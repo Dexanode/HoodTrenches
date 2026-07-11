@@ -1,9 +1,10 @@
 import { GmgnTrenches } from "../adapters/gmgn.js";
 import { TwitterNarrative } from "../adapters/twitter.js";
+import { DeployerOnchain } from "../adapters/onchain.js";
 import { scoreToken } from "./scoring.js";
 
 export class HoodTrenchesBot {
-  constructor(config, store, logger) { this.config = config; this.store = store; this.logger = logger; this.gmgn = new GmgnTrenches(config); this.twitter = new TwitterNarrative(config, store); this.timer = null; this.paused = false; this.alertSink = null; this.batchSink = null; this.alertedAt = new Map(); }
+  constructor(config, store, logger) { this.config = config; this.store = store; this.logger = logger; this.gmgn = new GmgnTrenches(config); this.twitter = new TwitterNarrative(config, store); this.onchain = new DeployerOnchain(config); this.timer = null; this.paused = false; this.alertSink = null; this.batchSink = null; this.alertedAt = new Map(); }
   setAlertSink(sink) { this.alertSink = sink; }
   setBatchSink(sink) { this.batchSink = sink; }
   shouldAlertImmediately(event) {
@@ -20,6 +21,8 @@ export class HoodTrenchesBot {
     let tokens; try { tokens = await this.gmgn.poll(); } catch (error) { this.fail(error); return; }
     for (const token of tokens) {
       let social; try { social = await this.twitter.enrich(token); } catch (error) { social = { available: false, reason: error.message }; }
+      let deployerOnchain; try { deployerOnchain = await this.onchain.enrich(token.deployer.address); } catch (error) { deployerOnchain = { available: false, reason: error.message }; }
+      token.deployer.onchain = deployerOnchain;
       const analysis = scoreToken(token, social, this.store.snapshot().smartWallets);
       const event = { ...token, social, analysis };
       this.store.addEvent(event);

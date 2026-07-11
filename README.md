@@ -56,3 +56,5 @@ Telegram commands: `/status`, `/wallets`, `/addwallet 0x... label`, `/delwallet 
 Tracked wallet matches currently use wallet addresses present in GMGN token payloads. Full real-time transfer monitoring requires a Robinhood Chain RPC/indexer and is intentionally not inferred.
 
 State and the latest 48 social snapshots per tweet are stored in `data/state.json`.
+
+Deployer enrichment reads Robinhood Chain mainnet (chain ID 4663) through JSON-RPC and the official Blockscout explorer. It reports native ETH balance, earliest indexed inbound funding, wallet/contract status, and up to five token holdings. Public endpoints are rate-limited; configure an Alchemy Robinhood RPC URL for production reliability.
