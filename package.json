@@ -1,0 +1,17 @@
+{
+  "name": "hoodtrenches",
+  "version": "0.2.0",
+  "description": "Robinhood Chain trenches intelligence and Telegram alert bot.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart hoodtrenches --update-env",
+    "pm2:logs": "pm2 logs hoodtrenches"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": { "gmgn-cli": "^1.5.2" }
+}
